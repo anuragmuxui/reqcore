@@ -1,5 +1,5 @@
 # ─── Stage 1: Build ─────────────────────────────────────────────────────────
-FROM node:22.22-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install dependencies first (layer-cached unless package.json changes).
@@ -26,13 +26,11 @@ ENV POSTHOG_HOST=${POSTHOG_HOST}
 RUN npm run build
 
 # ─── Stage 2: Run ────────────────────────────────────────────────────────────
-FROM node:22.22-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-
-# PostgreSQL client tools for database backup via /api/updates/backup
-RUN apk add --no-cache postgresql16-client
+ENV NITRO_HOST=0.0.0.0
 
 RUN addgroup -S reqcore && adduser -S reqcore -G reqcore
 
@@ -45,13 +43,6 @@ COPY --chown=reqcore:reqcore --from=builder /app/server/database/migrations ./se
 
 # CHANGELOG.md is read at runtime by /api/updates/changelog
 COPY --chown=reqcore:reqcore --from=builder /app/CHANGELOG.md ./CHANGELOG.md
-
-# Seed script support — copies node_modules, package.json, and server source
-# so `docker compose exec app npm run db:seed` works inside the container
-COPY --chown=reqcore:reqcore --from=builder /app/package.json ./package.json
-COPY --chown=reqcore:reqcore --from=builder /app/drizzle.config.ts ./drizzle.config.ts
-COPY --chown=reqcore:reqcore --from=builder /app/node_modules ./node_modules
-COPY --chown=reqcore:reqcore --from=builder /app/server ./server
 
 USER reqcore
 

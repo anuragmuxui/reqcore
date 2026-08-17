@@ -175,3 +175,70 @@ Reqcore is licensed under the [GNU Affero General Public License v3.0](LICENSE),
 ### Third-party data
 
 The bundled place data used by the job-location picker (`server/utils/geo/data/`) is derived from [GeoNames](https://www.geonames.org), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Regenerate it with `npx tsx server/scripts/generate-geo-dataset.ts`.
+
+## Docker Installation
+
+### Prerequisites
+
+- Docker Engine 24+ (with Docker Compose v2)
+- A reachable PostgreSQL database
+- A reachable S3-compatible object store (for example MinIO or AWS S3)
+
+### Run with Docker Compose
+
+`docker-compose.yml` includes a single `app` service and safe defaults.
+
+```bash
+docker compose up -d --build
+```
+
+The app is exposed on `http://localhost:3000` by default.
+
+### Run with raw Docker commands
+
+```bash
+docker build -t reqcore:latest .
+
+docker run -d --name reqcore_app \
+  --add-host=host.docker.internal:host-gateway \
+  -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e DATABASE_URL=postgresql://db-host:5432/reqcore \
+  -e BETTER_AUTH_SECRET=change-me-to-a-32-plus-character-secret \
+  -e BETTER_AUTH_URL=http://localhost:3000 \
+  -e S3_ENDPOINT=http://host.docker.internal:9000 \
+  -e S3_ACCESS_KEY=minioadmin \
+  -e S3_SECRET_KEY=minioadmin \
+  -e S3_BUCKET=reqcore \
+  -e S3_REGION=us-east-1 \
+  -e S3_FORCE_PATH_STYLE=true \
+  reqcore:latest
+```
+
+### Custom port and environment variables
+
+- Change host port mapping:
+
+  ```bash
+  APP_PORT=8080 docker compose up -d --build
+  ```
+
+- Override startup environment values:
+
+  ```bash
+  DATABASE_URL=postgresql://db.example.com:5432/reqcore \
+  S3_ENDPOINT=https://s3.example.com \
+  S3_ACCESS_KEY=your-access-key \
+  S3_SECRET_KEY=your-secret-key \
+  S3_BUCKET=reqcore \
+  BETTER_AUTH_SECRET=replace-with-a-long-random-secret \
+  BETTER_AUTH_URL=https://reqcore.example.com \
+  docker compose up -d --build
+  ```
+
+### Stop and remove
+
+```bash
+docker compose down
+docker rm -f reqcore_app 2>/dev/null || true
+```
