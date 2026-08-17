@@ -176,35 +176,45 @@ Reqcore is licensed under the [GNU Affero General Public License v3.0](LICENSE),
 
 The bundled place data used by the job-location picker (`server/utils/geo/data/`) is derived from [GeoNames](https://www.geonames.org), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Regenerate it with `npx tsx server/scripts/generate-geo-dataset.ts`.
 
-## Docker Installation
+## Run with prebuilt GHCR image
 
-### Prerequisites
+Image: `ghcr.io/anuragmuxui/reqcore:latest`
 
-- Docker Engine 24+ (with Docker Compose v2)
-- A reachable PostgreSQL database
-- A reachable S3-compatible object store (for example MinIO or AWS S3)
-
-### Run with Docker Compose
-
-`docker-compose.yml` includes a single `app` service and safe defaults.
+### 1) Pull image
 
 ```bash
-docker compose up -d --build
+docker pull ghcr.io/anuragmuxui/reqcore:latest
 ```
 
-The app is exposed on `http://localhost:3000` by default.
-
-### Run with raw Docker commands
+### 2) Recommended: one-command local stack (Reqcore + PostgreSQL)
 
 ```bash
-docker build -t reqcore:latest .
+docker compose -f docker-compose.ghcr.yml up -d
+```
 
-docker run -d --name reqcore_app \
+Defaults in `docker-compose.ghcr.yml`:
+- App: `http://localhost:3000`
+- Postgres DB: `reqcore`
+- Postgres user/password: `reqcore` / `reqcore`
+- DB migrations run automatically on startup (`REQCORE_RUN_MIGRATIONS_ON_START=true`)
+
+### Optional: raw docker run (Postgres + app)
+
+```bash
+docker network create reqcore_net
+
+docker run -d --name reqcore_db --network reqcore_net \
+  -e POSTGRES_USER=reqcore \
+  -e POSTGRES_PASSWORD=reqcore \
+  -e POSTGRES_DB=reqcore \
+  -v reqcore_postgres_data:/var/lib/postgresql/data \
+  postgres:16-alpine
+
+docker run -d --name reqcore_app --network reqcore_net \
   --add-host=host.docker.internal:host-gateway \
   -p 3000:3000 \
-  -e NODE_ENV=production \
-  -e DATABASE_URL=postgresql://db-host:5432/reqcore \
-  -e BETTER_AUTH_SECRET=change-me-to-a-32-plus-character-secret \
+  -e DATABASE_URL=******reqcore_db:5432/reqcore \
+  -e BETTER_AUTH_SECRET=local-dev-only-change-this-secret-1234567890 \
   -e BETTER_AUTH_URL=http://localhost:3000 \
   -e S3_ENDPOINT=http://host.docker.internal:9000 \
   -e S3_ACCESS_KEY=minioadmin \
@@ -212,33 +222,23 @@ docker run -d --name reqcore_app \
   -e S3_BUCKET=reqcore \
   -e S3_REGION=us-east-1 \
   -e S3_FORCE_PATH_STYLE=true \
-  reqcore:latest
+  ghcr.io/anuragmuxui/reqcore:latest
 ```
 
-### Custom port and environment variables
-
-- Change host port mapping:
-
-  ```bash
-  APP_PORT=8080 docker compose up -d --build
-  ```
-
-- Override startup environment values:
-
-  ```bash
-  DATABASE_URL=postgresql://db.example.com:5432/reqcore \
-  S3_ENDPOINT=https://s3.example.com \
-  S3_ACCESS_KEY=your-access-key \
-  S3_SECRET_KEY=your-secret-key \
-  S3_BUCKET=reqcore \
-  BETTER_AUTH_SECRET=replace-with-a-long-random-secret \
-  BETTER_AUTH_URL=https://reqcore.example.com \
-  docker compose up -d --build
-  ```
-
-### Stop and remove
+### Override env vars
 
 ```bash
-docker compose down
-docker rm -f reqcore_app 2>/dev/null || true
+APP_PORT=8080 \
+POSTGRES_PASSWORD=change-me \
+BETTER_AUTH_SECRET=replace-with-a-long-random-secret \
+docker compose -f docker-compose.ghcr.yml up -d
+```
+
+### Stop and remove stack / volumes
+
+```bash
+docker compose -f docker-compose.ghcr.yml down
+docker compose -f docker-compose.ghcr.yml down -v
+docker rm -f reqcore_app reqcore_db 2>/dev/null || true
+docker network rm reqcore_net 2>/dev/null || true
 ```
