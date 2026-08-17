@@ -1,13 +1,21 @@
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { db } from '../utils/db'
+import { shouldSkipRuntimeMigrations } from '../utils/migrations'
 
 export default defineNitroPlugin(async () => {
   // Skip during build-time prerendering — database isn't available
   if (import.meta.prerender) return
 
+  const skipReason = shouldSkipRuntimeMigrations(process.env)
+  if (skipReason === 'env-toggle') {
+    console.log('[Reqcore] Skipping runtime migrations (REQCORE_RUN_MIGRATIONS_ON_START=false)')
+    logInfo('migrations.skipped_env_toggle')
+    return
+  }
+
   // Railway handles schema sync via preDeploy commands.
   // Running runtime migrations there can conflict with drizzle-kit push/migrate.
-  if (process.env.RAILWAY_ENVIRONMENT_ID) {
+  if (skipReason === 'railway') {
     console.log('[Reqcore] Skipping runtime migrations on Railway (handled in preDeploy)')
     logInfo('migrations.skipped_railway')
     return

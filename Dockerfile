@@ -31,6 +31,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NITRO_HOST=0.0.0.0
+ENV REQCORE_RUN_MIGRATIONS_ON_START=true
 
 RUN addgroup -S reqcore && adduser -S reqcore -G reqcore
 
